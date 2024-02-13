@@ -1,5 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
+import pickle
 
 from rbm import RBM, sigmoid
 from dbn import DBN
@@ -173,3 +174,21 @@ class DNN:
         if plot_:
             self.plot_loss_acc([losses, val_losses], [accuracies, val_accuracies], labels=['Train', 'Test'], suptitle=suptitle)
         return losses, accuracies, val_losses, val_accuracies
+    
+    def save_weights(self, path):
+        dict_weights = self.dbn.save_weights(path=None)
+        dict_weights['classif'] = self.rbm_classification.save_weights(path=None)
+        
+        if path is None:
+            return dict_weights
+        if not path.endswith('.pkl'):
+            path += '.pkl'
+        with open(path, 'wb') as f:
+            pickle.dump(dict_weights, f) 
+            
+    def load_weights(self, path, dict_weights=None):
+        if dict_weights is None:
+            with open(path, 'rb') as f:
+                dict_weights = pickle.load(f)
+        self.rbm_classification.load_weights(path=None, dict_weights=dict_weights.pop('classif'))
+        self.dbn.load_weights(path=None, dict_weights=dict_weights)

@@ -1,5 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
+import pickle
 
 from rbm import RBM, sigmoid
 from tqdm import tqdm
@@ -55,4 +56,25 @@ class DBN:
             for i in range(nrows):
                 for j in range(ncols):
                     plot_im(generated_data[nrows*i+j], ax=axs[i][j])
-        return generated_data        
+        return generated_data   
+    
+    def save_weights(self, path):
+        dict_weights = {}
+        for i, rbm in enumerate(self.rbms):
+            dict_weights[i] = rbm.save_weights(path=None)
+            
+        if path is None:
+            return dict_weights
+            
+        if not path.endswith('.pkl'):
+            path += '.pkl'
+        with open(path, 'wb') as f:
+            pickle.dump(dict_weights, f) 
+            
+    def load_weights(self, path, dict_weights=None):
+        if dict_weights is None:
+            with open(path, 'rb') as f:
+                dict_weights = pickle.load(f)
+        for i in range(len(dict_weights)):
+            self.rbms[i].load_weights(path=None, dict_weights=dict_weights[i])
+             

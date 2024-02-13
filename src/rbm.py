@@ -2,6 +2,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from tqdm import tqdm
 from IPython.display import clear_output
+import pickle
 
 import warnings
 warnings.filterwarnings('ignore')
@@ -108,3 +109,25 @@ class RBM:
                 for j in range(ncols):
                     plot_im(h[nrows*i+j], ax=axs[i][j])
         return X, h
+    
+    def save_weights(self, path):
+        dict_weights = {
+            'a': self.a,
+            'W': self.W,
+            'b': self.b
+        }
+        if path is None:
+            return dict_weights
+        
+        if not path.endswith('.pkl'):
+            path += '.pkl'
+        with open(path, 'wb') as f:
+            pickle.dump(dict_weights, f) 
+            
+    def load_weights(self, path, dict_weights=None):
+        if dict_weights is None:
+            with open(path, 'rb') as f:
+                dict_weights = pickle.load(f)
+        self.b = dict_weights['b']
+        self.W = dict_weights['W']
+        self.a = dict_weights['a']
