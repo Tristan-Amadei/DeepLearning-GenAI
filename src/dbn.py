@@ -27,7 +27,7 @@ class DBN:
         h = self.X.copy()
         for rbm in tqdm(self.rbms):
             rbm.update_X(h)
-            rbm.train_RBM(epochs=epochs, learning_rate=learning_rate, batch_size=batch_size, print_error_every=-1)
+            rbm.train_RBM(epochs=epochs, learning_rate=learning_rate, batch_size=batch_size, print_error_every=epochs//50)
             h, _ = rbm.entree_sortie_RBM(h)  # sigmoid(h @ rbm.W + rbm.b)
             
     def generer_image_DBN(self, num_samples, gibbs_steps, ncols=10, image_size=(20, 16)):
