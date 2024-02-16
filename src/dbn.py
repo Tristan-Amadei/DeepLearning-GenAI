@@ -1,15 +1,17 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import pickle
+from IPython.display import clear_output
 
 from rbm import RBM, sigmoid
 from tqdm import tqdm
 
 class DBN:
-    def __init__(self, X, L, qs):
+    def __init__(self, X, L, qs, use_adam=False):
         self.X = X
         self.L = L
         self.qs = qs
+        self.use_adam = use_adam
         self.init_DBN()
         
     def init_DBN(self):
@@ -20,15 +22,22 @@ class DBN:
             # we will update them later on, iteratively during training
             h = self.rbms[-1].b
             self.rbms.append(
-                RBM(h, self.qs[i])
+                RBM(h, self.qs[i], use_adam=self.use_adam)
             )
         
     def train_DBN(self, epochs, learning_rate, batch_size):
         h = self.X.copy()
-        for rbm in tqdm(self.rbms):
-            rbm.update_X(h)
-            rbm.train_RBM(epochs=epochs, learning_rate=learning_rate, batch_size=batch_size, print_error_every=-1)
-            h, _ = rbm.entree_sortie_RBM(h)  # sigmoid(h @ rbm.W + rbm.b)
+        total_loss = 0.
+        with tqdm(self.rbms, unit='rbm') as bar:
+            for i, rbm in enumerate(self.rbms):
+                bar.set_description(f'RBM {i}')
+                rbm.update_X(h)
+                loss_rbm = rbm.train_RBM(epochs=epochs, learning_rate=learning_rate, batch_size=batch_size, print_error_every=-1)
+                h, _ = rbm.entree_sortie_RBM(h)  # sigmoid(h @ rbm.W + rbm.b)
+                total_loss += loss_rbm[-1]
+                bar.set_postfix(total_loss=total_loss)
+                bar.update(1)
+                clear_output(wait=False)
             
     def generer_image_DBN(self, num_samples, gibbs_steps, ncols=10, image_size=(20, 16)):
         # Start with a random input for the topmost RBM

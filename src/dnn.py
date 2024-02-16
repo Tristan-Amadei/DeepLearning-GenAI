@@ -4,9 +4,10 @@ import pickle
 
 from rbm import RBM, sigmoid
 from dbn import DBN
+from optimizers import AdamOptimizer, SGD
 
 class DNN:
-    def __init__(self, X_train, y_train, num_classes, num_hidden_layers, neurons, X_val=None, y_val=None):
+    def __init__(self, X_train, y_train, num_classes, num_hidden_layers, neurons, X_val=None, y_val=None, use_adam=False):
         self.X_train = X_train
         self.y_train = y_train
         self.X_val = X_val
@@ -14,11 +15,12 @@ class DNN:
         self.num_classes = num_classes
         self.num_hidden_layers = num_hidden_layers
         self.neurons = neurons
+        self.use_adam = use_adam
         self.init_DNN()
         
     def init_DNN(self):
-        self.dbn = DBN(self.X_train, self.num_hidden_layers, self.neurons)
-        rbm_classification = RBM(self.dbn.rbms[-1].b, self.num_classes)
+        self.dbn = DBN(self.X_train, self.num_hidden_layers, self.neurons, use_adam=self.use_adam)
+        rbm_classification = RBM(self.dbn.rbms[-1].b, self.num_classes, use_adam=self.use_adam)
         self.rbm_classification = rbm_classification
         
     def pretrain_DNN(self, epochs, learning_rate, batch_size):
@@ -106,6 +108,14 @@ class DNN:
             plot(acc, axs[1], label=labels[i], title='Accuracy')
         plt.suptitle(suptitle)
         plt.show()
+        
+    def init_optimizers(self, learning_rate):
+        for rbm in self.dbn.rbms + [self.rbm_classification]:
+            if rbm.optimizer is None:
+                if self.use_adam:
+                    rbm.optimizer = AdamOptimizer(rbm=rbm, lr=learning_rate)
+                else:
+                    rbm.optimizer = SGD(rbm=rbm, lr=learning_rate)
     
     def retropropagation(self, epochs, learning_rate, batch_size, print_error_every=None, 
                          plot_=False, patience=np.inf, suptitle=''):
@@ -113,6 +123,8 @@ class DNN:
         
         if print_error_every is None:
             print_error_every = 1 if epochs < 10 else epochs / 10
+            
+        self.init_optimizers(learning_rate=learning_rate)
         
         min_val_loss = np.inf
         patience_counter = 0
@@ -157,8 +169,9 @@ class DNN:
                     
                     grad_W = x_p_minus_one.T @ c_p
                     grad_b = np.sum(c_p, axis=0)
-                    rbm.W -= learning_rate * grad_W
-                    rbm.b -= learning_rate * grad_b
+                    #rbm.W -= learning_rate * grad_W
+                    #rbm.b -= learning_rate * grad_b
+                    rbm.optimizer.step(grad_W=grad_W, grad_b=grad_b, grad_a=None, descent=True)
                 
             loss /= n
             losses.append(loss)

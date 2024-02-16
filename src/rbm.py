@@ -1,3 +1,5 @@
+from optimizers import AdamOptimizer, SGD
+
 import matplotlib.pyplot as plt
 import numpy as np
 from tqdm import tqdm
@@ -11,13 +13,15 @@ def sigmoid(x):
     return 1 / (1 + np.exp(-x))
 
 class RBM:
-    def __init__(self, X, q):
+    def __init__(self, X, q, use_adam=False):
         if len(X.shape) <= 1:
             X = X[np.newaxis, :]
         self.X = X
         self.p = self.X.shape[1]
         self.q = q
         self.init_rbm()
+        self.use_adam = use_adam
+        self.optimizer = None
         
     def update_X(self, X):
         if len(X.shape) <= 1:
@@ -46,6 +50,11 @@ class RBM:
         
         if print_error_every is None:
             print_error_every = 1 if epochs < 10 else epochs / 10
+            
+        if self.use_adam:
+            self.optimizer = AdamOptimizer(rbm=self, lr=learning_rate)
+        else:
+            self.optimizer = SGD(rbm=self, lr=learning_rate)
         
         errors = []
         for epoch in range(epochs):
@@ -70,9 +79,10 @@ class RBM:
                 grad_W = X_batch.T @ probabilities_h_given_v0 - v.T @ probabilities_h_given_v1
                 
                 # Update weights
-                self.a += learning_rate * grad_a
-                self.b += learning_rate * grad_b
-                self.W += learning_rate * grad_W
+                # self.a += learning_rate * grad_a
+                # self.b += learning_rate * grad_b
+                # self.W += learning_rate * grad_W
+                self.optimizer.step(grad_W=grad_W, grad_b=grad_b, grad_a=grad_a, descent=False)
             quadratic_error /= (n*p)
             errors.append(quadratic_error)
             if (epoch % print_error_every == 0 or epoch == epochs-1) and print_error_every != -1:
