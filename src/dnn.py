@@ -182,8 +182,11 @@ class DNN:
                                                 min_val_loss, patience_counter, patience, epoch, epochs, print_error_every)
             if patience_trigger:
                 print(f'##### Patience triggered at epoch {epoch}! #####')
+                _, _, _= self.compute_and_plot_metrics(loss, accuracy, val_losses, val_accuracies, 
+                            min_val_loss, patience_counter, patience, epoch, epochs, epoch)
                 break
-                    
+
+        val_losses, val_accuracies = val_losses[:len(losses)], val_accuracies[:len(accuracies)] # this is because if patience is triggered, the last validation values are added twice to the lists
         if plot_:
             self.plot_loss_acc([losses, val_losses], [accuracies, val_accuracies], labels=['Train', 'Test'], suptitle=suptitle)
         return losses, accuracies, val_losses, val_accuracies
