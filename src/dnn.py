@@ -153,8 +153,9 @@ class DNN:
                 grad_W_clf = outputs[-2].T @ proba_diff_clf
                 grad_b_clf = np.sum(proba_diff_clf, axis=0)
                 W_plus_one = self.rbm_classification.W.copy() # copy it before gradient descent as it is needed later on
-                self.rbm_classification.W -= learning_rate * grad_W_clf
-                self.rbm_classification.b -= learning_rate * grad_b_clf
+                #self.rbm_classification.W -= learning_rate * grad_W_clf
+                #self.rbm_classification.b -= learning_rate * grad_b_clf7
+                self.rbm_classification.optimizer.step(grad_W = grad_W_clf, grad_b=grad_b_clf, grad_a=None, descent=True)
                 
                 ### Gradient hidden RBMs ###
                 c_plus_one = proba_diff_clf
