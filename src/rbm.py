@@ -79,9 +79,6 @@ class RBM:
                 grad_W = X_batch.T @ probabilities_h_given_v0 - v.T @ probabilities_h_given_v1
                 
                 # Update weights
-                # self.a += learning_rate * grad_a
-                # self.b += learning_rate * grad_b
-                # self.W += learning_rate * grad_W
                 self.optimizer.step(grad_W=grad_W, grad_b=grad_b, grad_a=grad_a, descent=False)
             quadratic_error /= (n*p)
             errors.append(quadratic_error)

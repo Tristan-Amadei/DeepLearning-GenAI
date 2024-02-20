@@ -111,11 +111,10 @@ class DNN:
         
     def init_optimizers(self, learning_rate):
         for rbm in self.dbn.rbms + [self.rbm_classification]:
-            if rbm.optimizer is None:
-                if self.use_adam:
-                    rbm.optimizer = AdamOptimizer(rbm=rbm, lr=learning_rate)
-                else:
-                    rbm.optimizer = SGD(rbm=rbm, lr=learning_rate)
+            if self.use_adam:
+                rbm.optimizer = AdamOptimizer(rbm=rbm, lr=learning_rate)
+            else:
+                rbm.optimizer = SGD(rbm=rbm, lr=learning_rate)
     
     def retropropagation(self, epochs, learning_rate, batch_size, print_error_every=None, 
                          plot_=False, patience=np.inf, suptitle=''):
@@ -153,8 +152,6 @@ class DNN:
                 grad_W_clf = outputs[-2].T @ proba_diff_clf
                 grad_b_clf = np.sum(proba_diff_clf, axis=0)
                 W_plus_one = self.rbm_classification.W.copy() # copy it before gradient descent as it is needed later on
-                #self.rbm_classification.W -= learning_rate * grad_W_clf
-                #self.rbm_classification.b -= learning_rate * grad_b_clf7
                 self.rbm_classification.optimizer.step(grad_W = grad_W_clf, grad_b=grad_b_clf, grad_a=None, descent=True)
                 
                 ### Gradient hidden RBMs ###
@@ -170,8 +167,6 @@ class DNN:
                     
                     grad_W = x_p_minus_one.T @ c_p
                     grad_b = np.sum(c_p, axis=0)
-                    #rbm.W -= learning_rate * grad_W
-                    #rbm.b -= learning_rate * grad_b
                     rbm.optimizer.step(grad_W=grad_W, grad_b=grad_b, grad_a=None, descent=True)
                 
             loss /= n
