@@ -19,8 +19,8 @@ class DNN:
         self.init_DNN()
         
     def init_DNN(self):
-        self.dbn = DBN(self.X_train, self.num_hidden_layers, self.neurons, use_adam=self.use_adam)
-        rbm_classification = RBM(self.dbn.rbms[-1].b, self.num_classes, use_adam=self.use_adam)
+        self.dbn = DBN(self.X_train, self.num_hidden_layers, self.neurons, use_adam=False)
+        rbm_classification = RBM(self.dbn.rbms[-1].b, self.num_classes, use_adam=False)
         self.rbm_classification = rbm_classification
         
     def pretrain_DNN(self, epochs, learning_rate, batch_size):
