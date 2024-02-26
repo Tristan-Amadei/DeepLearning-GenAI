@@ -7,6 +7,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.data import TensorDataset, DataLoader
 from torchvision import models
+import torchvision.transforms as transforms
 
 
 
@@ -79,8 +80,8 @@ class Encoder(nn.Module):
         self.conv2 = nn.Conv2d(32, 64, kernel_size=3, stride=2)
 
         # Fully connected layers
-        #self.lin1 = nn.Linear(64 * 6 * 6, 256)
-        self.lin2 = nn.Linear(64*6*6, 2 * self.latent_dim)
+        self.lin1 = nn.Linear(64 * 6 * 6, 256)
+        self.lin2 = nn.Linear(256, 2 * self.latent_dim)
 
     def forward(self, x):
         batch_size = x.size(0)
@@ -92,8 +93,8 @@ class Encoder(nn.Module):
 
         x = x.view(batch_size, -1)
 
-        #x = self.lin1(x)
-        #x = F.relu(x)
+        x = self.lin1(x)
+        x = F.relu(x)
         x = self.lin2(x)  # no activation
         return x
 
@@ -102,8 +103,8 @@ class Decoder(nn.Module):
     def __init__(self, latent_dim):
         super(Decoder, self).__init__()
 
-        #self.lin1 = nn.Linear(latent_dim, 256)
-        self.lin2 = nn.Linear(latent_dim, 64 * 6 * 6)
+        self.lin1 = nn.Linear(latent_dim, 256)
+        self.lin2 = nn.Linear(256, 64 * 6 * 6)
 
         self.convT1 = nn.ConvTranspose2d(64, 64, kernel_size=3, stride=2, padding=0)
         self.convT2 = nn.ConvTranspose2d(64, 32, kernel_size=3, stride=2, padding=0)
@@ -112,8 +113,8 @@ class Decoder(nn.Module):
     def forward(self, x):
         batch_size = x.size(0)
 
-        #x = self.lin1(x)
-        #x = F.relu(x)
+        x = self.lin1(x)
+        x = F.relu(x)
         x = self.lin2(x)
         x = F.relu(x)
 
@@ -133,11 +134,12 @@ class VAEModel(nn.Module):
 
         self.latent_dim = latent_dim
         self.beta = beta
-        self.encoder = Encoder(latent_dim=latent_dim)
-        self.decoder = Decoder(latent_dim=latent_dim)
-        self.loss = BetaVAELoss(beta=self.beta)
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
+        self.encoder = Encoder(latent_dim=latent_dim).to(self.device)
+        self.decoder = Decoder(latent_dim=latent_dim).to(self.device)
+        self.loss = BetaVAELoss(beta=self.beta)
+        
     def reparameterize(self, mean, logvar, mode='sample'):
         """
         Samples from a normal distribution using the reparameterization trick.
@@ -227,9 +229,10 @@ class VAEModel(nn.Module):
     def train_vae(self, X_train, epochs, learning_rate=1e-3, batch_size=64, 
                     optimizer=None, print_error_every=1, plot_errors=True):
         if optimizer is None:
-            self.optimizer = torch.optim.AdamW(self.parameters(), 
-                                    weight_decay=learning_rate/10, 
-                                    lr=learning_rate)
+            #self.optimizer = torch.optim.AdamW(self.parameters(), 
+            #                        weight_decay=learning_rate/10, 
+            #                        lr=learning_rate)
+            self.optimizer = torch.optim.Adam(self.parameters(), lr=learning_rate)
 
         if len(X_train.shape) <= 2:
             X_train = X_train.reshape(-1, 1, 28, 28)
@@ -365,10 +368,10 @@ class VAEModel(nn.Module):
             return torch.stack([transform(image) for image in images])
 
         def pass_through_inception(loader):
-            inception_embeddings = np.zeros((len(X_test), 1000))  # Inception embeddings contain 1000 elements
+            inception_embeddings = np.zeros((len(X_test), 2048))  # Inception embeddings contain 1000 elements
             with torch.no_grad():
                 for i, data in enumerate(loader):
-                    data = data.to(self.device)
+                    data = data[0].to(self.device)
                     inception_images = preprocess_images(data)
                     embeddings = inception_model(inception_images).logits.cpu().numpy()
                     inception_embeddings[i*batch_size: i*batch_size+data.size(0)] = embeddings
@@ -398,7 +401,8 @@ class VAEModel(nn.Module):
 
         # Calculate Fréchet distance
         mean_difference = np.linalg.norm(real_mean - gen_mean, ord=2)
-        cov_sqrt = sqrtm(real_cov @ gen_cov).real
-        trace = np.trace(real_cov + gen_cov - 2*cov_sqrt)
+        offset = np.eye(real_cov.shape[0]) * 1e-6
+        cov_sqrt, _ = sqrtm((real_cov+offset) @ (gen_cov+offset), disp=False)
+        trace = np.trace(real_cov + gen_cov - 2*cov_sqrt.real)
 
         return mean_difference + trace
