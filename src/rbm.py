@@ -45,7 +45,7 @@ class RBM:
         values = (np.random.uniform(size=probabilities.shape) < probabilities).astype(int)
         return probabilities, values
     
-    def train_RBM(self, epochs, learning_rate, batch_size, print_error_every=None, plot_errors=False):
+    def train_RBM(self, epochs, learning_rate, batch_size, print_error_every=1, plot_errors=False):
         n, p = self.X.shape
         
         if print_error_every is None:
@@ -106,7 +106,7 @@ class RBM:
             ax.imshow(X.reshape(image_size), cmap='gray')
             ax.axis('off')
             
-        nrows = nb_to_generate // ncols
+        nrows = int(np.ceil(nb_to_generate/ncols))
         fig, axs = plt.subplots(nrows, ncols, figsize=(4*ncols, 4*nrows))
         if nrows == 1:
             for i, ax in enumerate(axs):

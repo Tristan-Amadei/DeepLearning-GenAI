@@ -116,7 +116,7 @@ class DNN:
             else:
                 rbm.optimizer = SGD(rbm=rbm, lr=learning_rate)
     
-    def retropropagation(self, epochs, learning_rate, batch_size, print_error_every=None, 
+    def retropropagation(self, epochs, learning_rate, batch_size, print_error_every=1, 
                          plot_=False, patience=np.inf, suptitle=''):
         n, _ = self.X_train.shape
         
