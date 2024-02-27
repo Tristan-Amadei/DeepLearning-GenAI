@@ -62,13 +62,18 @@ def one_hot_encode(y):
     return one_hot_labels
 
 def load_mnist(train_images_filepath=train_images_filepath, train_labels_filepath=train_labels_filepath,
-               test_images_filepath=test_images_filepath, test_labels_filepath=test_labels_filepath):
+               test_images_filepath=test_images_filepath, test_labels_filepath=test_labels_filepath, binarize=False):
     X_train, y_train = read_images_labels(train_images_filepath, train_labels_filepath)
     X_test, y_test = read_images_labels(test_images_filepath, test_labels_filepath)
+
+    X_train = (X_train / 255.).reshape(-1, 28*28)
+    X_test = (X_test / 255.).reshape(-1, 28*28)
     
-    X_train = ((X_train / 255.) > 0.5).reshape(-1, 28*28)
-    X_test = ((X_test / 255.) > 0.5).reshape(-1 ,28*28)
+    if binarize:
+        X_train = (X_train > 0.5).astype(int)
+        X_test = (X_train > 0.5).astype(int)
+
     y_train = one_hot_encode(y_train)
     y_test = one_hot_encode(y_test)
     
-    return X_train.astype(int), y_train, X_test.astype(int), y_test
+    return X_train, y_train, X_test, y_test
