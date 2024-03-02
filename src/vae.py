@@ -72,83 +72,58 @@ class BetaVAELoss(object):
 
 class Encoder(nn.Module):
 
-    def __init__(self, latent_dim):
+    def __init__(self, latent_dim, alpha_lrelu=0.3):
         super(Encoder, self).__init__()
-        self.latent_dim = latent_dim
+        self.alpha_lrelu = alpha_lrelu
 
-        self.conv1 = nn.Conv2d(1, 32, kernel_size=3, stride=2)
-        self.conv2 = nn.Conv2d(32, 64, kernel_size=3, stride=2)
-        self.conv3 = nn.Conv2d(64, 64, kernel_size=3, stride=2)
-
-        self.batchNorm1 = nn.BatchNorm2d(32)
-        self.batchNorm2 = nn.BatchNorm2d(64)
-        self.batchNorm3 = nn.BatchNorm2d(64)
-
-        self.fc = nn.Linear(64*2*2, 2 * self.latent_dim)
+        self.lin1 = nn.Linear(784, 512)
+        self.lin2 = nn.Linear(512, 256)
+        self.fc = nn.Linear(256, 2*latent_dim)
 
     def forward(self, x):
         batch_size = x.size(0)
 
-        x = self.conv1(x)
-        x = self.batchNorm1(x)
-        x = F.leaky_relu(x, 0.3)
-        x = self.conv2(x)
-        x = self.batchNorm2(x)
-        x = F.leaky_relu(x, 0.3)
-        x = self.conv3(x)
-        x = self.batchNorm3(x)
-        x = F.leaky_relu(x, 0.3)
+        x = self.lin1(x)
+        x = F.leaky_relu(x, self.alpha_lrelu)
+        x = self.lin2(x)
+        x = F.leaky_relu(x, self.alpha_lrelu)
 
-        x = x.view(batch_size, -1)
-
-        x = self.fc(x)
-        x = F.sigmoid(x)
+        x = self.fc(x)  # no activation
         return x
 
 class Decoder(nn.Module):
 
-    def __init__(self, latent_dim):
+    def __init__(self, latent_dim, alpha_lrelu=0.3):
         super(Decoder, self).__init__()
+        self.alpha_lrelu = alpha_lrelu
 
-        self.lin = nn.Linear(latent_dim, 64*2*2)
-
-        self.batchNorm1 = nn.BatchNorm2d(64)
-        self.batchNorm2 = nn.BatchNorm2d(32)
-        self.batchNorm3 = nn.BatchNorm2d(1)
-
-        self.convT1 = nn.ConvTranspose2d(64, 64, kernel_size=4, stride=2, padding=0)
-        self.convT2 = nn.ConvTranspose2d(64, 32, kernel_size=4, stride=2, padding=0)
-        self.convT3 = nn.ConvTranspose2d(32, 1, kernel_size=2, stride=2, padding=0)
+        self.lin1 = nn.Linear(latent_dim, 256)
+        self.lin2 = nn.Linear(256, 512)
+        self.lin3 = nn.Linear(512, 784)
 
     def forward(self, x):
         batch_size = x.size(0)
 
-        x = self.lin(x)
-        x = F.leaky_relu(x, 0.3)
-
-        x = x.view(-1, 64, 2, 2)
-
-        x = self.convT1(x)
-        x = self.batchNorm1(x)
-        x = F.leaky_relu(x, 0.3)
-        x = self.convT2(x)
-        x = self.batchNorm2(x)
-        x = F.leaky_relu(x, 0.3)
-        x = self.convT3(x)
-        x = self.batchNorm3(x)
+        x = self.lin1(x)
+        x = F.leaky_relu(x, self.alpha_lrelu)
+        x = self.lin2(x)
+        x = F.leaky_relu(x, self.alpha_lrelu)
+        x = self.lin3(x)
         x = F.sigmoid(x)
+
         return x
 
 class VAEModel(nn.Module):
-    def __init__(self, latent_dim, beta):
+    def __init__(self, latent_dim, beta, alpha_lrelu=0.3):
         super(VAEModel, self).__init__()
 
         self.latent_dim = latent_dim
         self.beta = beta
+        self.alpha_lrelu = alpha_lrelu
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-        self.encoder = Encoder(latent_dim=latent_dim).to(self.device)
-        self.decoder = Decoder(latent_dim=latent_dim).to(self.device)
+        self.encoder = Encoder(latent_dim=latent_dim, alpha_lrelu=alpha_lrelu).to(self.device)
+        self.decoder = Decoder(latent_dim=latent_dim, alpha_lrelu=alpha_lrelu).to(self.device)
         self.loss = BetaVAELoss(beta=self.beta)
         
     def reparameterize(self, mean, logvar, mode='sample'):
@@ -209,21 +184,9 @@ class VAEModel(nn.Module):
             'stats_qzx': stats_qzx,
             'samples_qzx': samples_qzx}
 
-    def sample_qzx(self, x):
-        """
-        Returns a sample z from the latent distribution q(z|x).
-
-        Parameters
-        ----------
-        x : torch.Tensor
-            Batch of data. Shape (batch_size, n_chan, height, width)
-        """
-        stats_qzx = self.encoder(x)
-        samples_qzx = self.reparameterize(*stats_qzx.unbind(-1))
-        return samples_qzx
 
     def sample_pz(self, N):
-        samples_pz = torch.randn(N, self.latent_dim, device=self.encoder.conv1.weight.device)
+        samples_pz = torch.randn(N, self.latent_dim, device=self.device)
         return samples_pz
 
     def generate_samples(self, samples_pz=None, N=None):
@@ -240,13 +203,10 @@ class VAEModel(nn.Module):
     def train_vae(self, X_train, epochs, learning_rate=1e-3, batch_size=64, 
                     optimizer=None, print_error_every=1, plot_errors=True, patience=50):
         if optimizer is None:
-            self.optimizer = torch.optim.AdamW(self.parameters(), 
-                                    weight_decay=learning_rate/10, 
-                                    lr=learning_rate)
-            # self.optimizer = torch.optim.Adam(self.parameters(), lr=learning_rate)
-
-        if len(X_train.shape) <= 2:
-            X_train = X_train.reshape(-1, 1, 28, 28)
+            #self.optimizer = torch.optim.AdamW(self.parameters(), 
+            #                        weight_decay=learning_rate/10, 
+            #                        lr=learning_rate)
+            self.optimizer = torch.optim.Adam(self.parameters(), lr=learning_rate)
 
         tensor_X = torch.Tensor(X_train) 
         dataset = TensorDataset(tensor_X) 
@@ -261,7 +221,7 @@ class VAEModel(nn.Module):
                 self.optimizer.zero_grad()
                 data = data[0].to(self.device)
 
-                predict = self(data)
+                predict = self(data, mode='mean')
                 reconstructions = predict['reconstructions']
                 stats_qzx = predict['stats_qzx']
 
@@ -295,8 +255,6 @@ class VAEModel(nn.Module):
         return train_losses
 
     def test_vae(self, X_test, plot_=True, nb_to_plot=10, ncols=5):
-        if len(X_test.shape) <= 2:
-            X_test = X_test.reshape(-1, 1, 28, 28)
 
         tensor_X = torch.Tensor(X_test) 
         dataset = TensorDataset(tensor_X) 
@@ -372,60 +330,65 @@ class VAEModel(nn.Module):
         return generated_images
 
     def compute_fid_score(self, X_test, batch_size=32):
-        inception_model = models.inception_v3(weights='IMAGENET1K_V1').to(self.device)
-        inception_model.fc = nn.Identity()  # we cannot directly remove the classification layer from Inception
-                                            # we artificially remove it by replacing it by an identity layer
-
-        class GrayscaleToRgb:
-            def __call__(self, tensor):
-                # tensor is a 1-channel grayscale image
-                return tensor.repeat(3, 1, 1)
-
-        transform = transforms.Compose([
-            GrayscaleToRgb(),
-            transforms.Resize((342, 342), antialias=True),
-            transforms.CenterCrop((299, 299)),
-            transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
-        ])
-        def preprocess_images(images):
-            return torch.stack([transform(image) for image in images])
-
-        def pass_through_inception(loader):
-            inception_embeddings = np.zeros((len(X_test), 2048))  # Inception embeddings contain 1000 elements
-            with torch.no_grad():
-                for i, data in enumerate(loader):
-                    data = data[0].to(self.device)
-                    inception_images = preprocess_images(data)
-                    embeddings = inception_model(inception_images).logits.cpu().numpy()
-                    inception_embeddings[i*batch_size: i*batch_size+data.size(0)] = embeddings
-            return inception_embeddings
-
-        if len(X_test.shape) <= 2:
-            X_test = X_test.reshape(-1, 1, 28, 28)
-
-        tensor_X = torch.Tensor(X_test) 
-        dataset = TensorDataset(tensor_X) 
-        dataloader = DataLoader(dataset, batch_size=batch_size)
-
-        # Pass real test images through InceptionV3
-        real_embeddings = pass_through_inception(dataloader)
-        
-        torch.cuda.empty_cache()
-        # Generate samples using the VAE model
         N = len(X_test)
         generated_images = self.generate_data(nb_to_generate=N, plot_=False)
-        gen_dataset = TensorDataset(torch.Tensor(generated_images))
-        gen_loader = DataLoader(gen_dataset, batch_size=batch_size, shuffle=False)
-        # Pass generated images through InceptionV3
-        generated_embeddings = pass_through_inception(gen_loader)
+        return compute_fid_score(X_test, generated_images, self.device, batch_size=batch_size)
 
-        real_mean, real_cov = np.mean(real_embeddings, axis=0), np.cov(real_embeddings, rowvar=True)
-        gen_mean, gen_cov = np.mean(generated_embeddings, axis=0), np.cov(generated_embeddings, rowvar=True)
 
-        # Calculate Fréchet distance
-        mean_difference = np.linalg.norm(real_mean - gen_mean, ord=2)
-        offset = np.eye(real_cov.shape[0]) * 1e-6
-        cov_sqrt, _ = sqrtm((real_cov+offset) @ (gen_cov+offset), disp=False)
-        trace = np.trace(real_cov + gen_cov - 2*cov_sqrt.real)
+def compute_fid_score(X_test, generated_images, device, batch_size=32):
+    inception_model = models.inception_v3(weights='IMAGENET1K_V1').to(device)
+    inception_model.fc = nn.Identity()  # we cannot directly remove the classification layer from Inception
+                                        # we artificially remove it by replacing it by an identity layer
 
-        return mean_difference + trace
+    class GrayscaleToRgb:
+        def __call__(self, tensor):
+            # tensor is a 1-channel grayscale image
+            return tensor.repeat(3, 1, 1)
+
+    transform = transforms.Compose([
+        GrayscaleToRgb(),
+        transforms.Resize((342, 342), antialias=True),
+        transforms.CenterCrop((299, 299)),
+        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+    ])
+    def preprocess_images(images):
+        return torch.stack([transform(image) for image in images])
+
+    def pass_through_inception(loader):
+        inception_embeddings = np.zeros((len(X_test), 2048))  # Inception embeddings contain 2048 elements
+                                                              # they correspond to the output of the final convolutional layer, just after the global pooling
+        with torch.no_grad():
+            for i, data in enumerate(loader):
+                data = data[0].to(device)
+                inception_images = preprocess_images(data)
+                embeddings = inception_model(inception_images).logits.cpu().numpy()
+                inception_embeddings[i*batch_size: i*batch_size+data.size(0)] = embeddings
+        return inception_embeddings
+
+    if len(X_test.shape) <= 2:
+        X_test = X_test.reshape(-1, 1, 28, 28)
+
+    tensor_X = torch.Tensor(X_test) 
+    dataset = TensorDataset(tensor_X) 
+    dataloader = DataLoader(dataset, batch_size=batch_size)
+
+    # Pass real test images through InceptionV3
+    real_embeddings = pass_through_inception(dataloader)
+    
+    torch.cuda.empty_cache()
+
+    gen_dataset = TensorDataset(torch.Tensor(generated_images))
+    gen_loader = DataLoader(gen_dataset, batch_size=batch_size, shuffle=False)
+    # Pass generated images through InceptionV3
+    generated_embeddings = pass_through_inception(gen_loader)
+
+    real_mean, real_cov = np.mean(real_embeddings, axis=0), np.cov(real_embeddings, rowvar=True)
+    gen_mean, gen_cov = np.mean(generated_embeddings, axis=0), np.cov(generated_embeddings, rowvar=True)
+
+    # Calculate Fréchet distance
+    mean_difference = np.linalg.norm(real_mean - gen_mean, ord=2)
+    offset = np.eye(real_cov.shape[0]) * 1e-6
+    cov_sqrt, _ = sqrtm((real_cov+offset) @ (gen_cov+offset), disp=False)
+    trace = np.trace(real_cov + gen_cov - 2*cov_sqrt.real)
+
+    return mean_difference + trace
