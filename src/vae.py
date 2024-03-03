@@ -12,6 +12,7 @@ import torchvision.transforms as transforms
 
 
 def reconstruction_loss(data, reconstructions):
+    #print(data.mean(), reconstructions.mean())
 
     loss = F.binary_cross_entropy(reconstructions, data, reduction='sum')
     return loss
@@ -66,7 +67,7 @@ class BetaVAELoss(object):
 
         # Total loss of beta-VAE
         loss = rec_loss + self.beta * kl_loss
-
+        #loss = torch.clamp(loss, max=1e5)
         return loss
 
 
@@ -121,6 +122,7 @@ class VAEModel(nn.Module):
         self.beta = beta
         self.alpha_lrelu = alpha_lrelu
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        #self.device = torch.device("cpu")
 
         self.encoder = Encoder(latent_dim=latent_dim, alpha_lrelu=alpha_lrelu).to(self.device)
         self.decoder = Decoder(latent_dim=latent_dim, alpha_lrelu=alpha_lrelu).to(self.device)
@@ -145,7 +147,7 @@ class VAEModel(nn.Module):
             the mean is usually used for reconstruction, rather than a sample.
         """
         if mode=='sample':
-            # Implements the reparametrization trick (slide 43):
+            # Implements the reparametrization trick:
             std = torch.exp(0.5 * logvar)
             eps = torch.randn_like(std)
             return mean + eps
@@ -273,7 +275,7 @@ class VAEModel(nn.Module):
                 reconstructions = predict['reconstructions']
                 stats_qzx = predict['stats_qzx']
 
-                loss = self.loss(data, reconstructions, stats_qzx)
+                loss = self.loss(data, reconstructions, stats_qzx).clamp(0, 1e5)
                 total_loss += loss.item()
 
                 batch_size = stats_qzx.shape[0]
