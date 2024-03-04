@@ -275,7 +275,7 @@ class VAEModel(nn.Module):
                 reconstructions = predict['reconstructions']
                 stats_qzx = predict['stats_qzx']
 
-                loss = self.loss(data, reconstructions, stats_qzx).clamp(0, 1e5)
+                loss = self.loss(data, reconstructions, stats_qzx).clamp(0, 1e3)
                 total_loss += loss.item()
 
                 batch_size = stats_qzx.shape[0]
