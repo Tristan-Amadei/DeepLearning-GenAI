@@ -25,14 +25,14 @@ class DBN:
                 RBM(h, self.qs[i], use_adam=self.use_adam)
             )
         
-    def train_DBN(self, epochs, learning_rate, batch_size):
+    def train_DBN(self, epochs, learning_rate, batch_size, print_error_every=-1):
         h = self.X.copy()
         total_loss = 0.
         with tqdm(self.rbms, unit='rbm') as bar:
             for i, rbm in enumerate(self.rbms):
                 bar.set_description(f'RBM {i}')
                 rbm.update_X(h)
-                loss_rbm = rbm.train_RBM(epochs=epochs, learning_rate=learning_rate, batch_size=batch_size, print_error_every=-1)
+                loss_rbm = rbm.train_RBM(epochs=epochs, learning_rate=learning_rate, batch_size=batch_size, print_error_every=print_error_every)
                 h, _ = rbm.entree_sortie_RBM(h)  # sigmoid(h @ rbm.W + rbm.b)
                 total_loss += loss_rbm[-1]
                 bar.set_postfix(total_loss=total_loss)
