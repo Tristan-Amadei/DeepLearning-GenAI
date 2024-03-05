@@ -122,7 +122,6 @@ class VAEModel(nn.Module):
         self.beta = beta
         self.alpha_lrelu = alpha_lrelu
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        #self.device = torch.device("cpu")
 
         self.encoder = Encoder(latent_dim=latent_dim, alpha_lrelu=alpha_lrelu).to(self.device)
         self.decoder = Decoder(latent_dim=latent_dim, alpha_lrelu=alpha_lrelu).to(self.device)

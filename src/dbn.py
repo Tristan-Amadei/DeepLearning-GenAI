@@ -39,7 +39,7 @@ class DBN:
                 bar.update(1)
                 clear_output(wait=False)
             
-    def generer_image_DBN(self, num_samples, gibbs_steps, ncols=10, image_size=(20, 16)):
+    def generer_image_DBN(self, num_samples, gibbs_steps, ncols=10, image_size=(20, 16), plot_=True):
         # Start with a random input for the topmost RBM
         top_rbm = self.rbms[-1]
         h_L = (np.random.uniform(size=(num_samples, top_rbm.q)) < np.random.uniform(size=(num_samples, top_rbm.q))).astype(int)
@@ -56,15 +56,16 @@ class DBN:
             ax.imshow(X.reshape(image_size), cmap='gray')
             ax.axis('off')
             
-        nrows = num_samples // ncols
-        fig, axs = plt.subplots(nrows, ncols, figsize=(4*ncols, 4*nrows))
-        if nrows == 1:
-            for i, ax in enumerate(axs):
-                plot_im(generated_data[i], ax=ax)
-        else:
-            for i in range(nrows):
-                for j in range(ncols):
-                    plot_im(generated_data[nrows*i+j], ax=axs[i][j])
+        if plot_:
+            nrows = num_samples // ncols
+            fig, axs = plt.subplots(nrows, ncols, figsize=(4*ncols, 4*nrows))
+            if nrows == 1:
+                for i, ax in enumerate(axs):
+                    plot_im(generated_data[i], ax=ax)
+            else:
+                for i in range(nrows):
+                    for j in range(ncols):
+                        plot_im(generated_data[nrows*i+j], ax=axs[i][j])
         return generated_data   
     
     def save_weights(self, path):

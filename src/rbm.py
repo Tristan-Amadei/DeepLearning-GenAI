@@ -93,7 +93,7 @@ class RBM:
             plt.show()
         return errors
     
-    def generer_image_RBM(self, nb_step_gibbs, nb_to_generate, ncols=10, image_size=(20, 16)):
+    def generer_image_RBM(self, nb_step_gibbs, nb_to_generate, ncols=10, image_size=(20, 16), plot_=True):
         # draw each X_i according to a Bernouilli with randomized parameter
         X = (np.random.uniform(size=(nb_to_generate, self.q)) < np.random.uniform(size=(nb_to_generate, self.q))).astype(int)
         
@@ -106,15 +106,16 @@ class RBM:
             ax.imshow(X.reshape(image_size), cmap='gray')
             ax.axis('off')
             
-        nrows = int(np.ceil(nb_to_generate/ncols))
-        fig, axs = plt.subplots(nrows, ncols, figsize=(4*ncols, 4*nrows))
-        if nrows == 1:
-            for i, ax in enumerate(axs):
-                plot_im(h[i], ax=ax)
-        else:
-            for i in range(nrows):
-                for j in range(ncols):
-                    plot_im(h[nrows*i+j], ax=axs[i][j])
+        if plot_:
+            nrows = int(np.ceil(nb_to_generate/ncols))
+            fig, axs = plt.subplots(nrows, ncols, figsize=(4*ncols, 4*nrows))
+            if nrows == 1:
+                for i, ax in enumerate(axs):
+                    plot_im(h[i], ax=ax)
+            else:
+                for i in range(nrows):
+                    for j in range(ncols):
+                        plot_im(h[nrows*i+j], ax=axs[i][j])
         return X, h
     
     def save_weights(self, path):
