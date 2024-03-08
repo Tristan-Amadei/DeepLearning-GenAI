@@ -45,7 +45,7 @@ class RBM:
         values = (np.random.uniform(size=probabilities.shape) < probabilities).astype(int)
         return probabilities, values
     
-    def train_RBM(self, epochs, learning_rate, batch_size, print_error_every=1, plot_errors=False):
+    def train_RBM(self, epochs, learning_rate, batch_size, print_error_every=1, plot_errors=False, save_every=None, save_path=None, add_epoch=True):
         n, p = self.X.shape
         
         if print_error_every is None:
@@ -84,6 +84,11 @@ class RBM:
             errors.append(quadratic_error)
             if (epoch % print_error_every == 0 or epoch == epochs-1) and print_error_every != -1:
                 print(f'Epoch {epoch}: error = {round(quadratic_error, 4)}')
+
+            if save_every is not None and epoch % save_every == 0:
+                save_path_ = save_path.split('.pkl')[0]
+                save_path_ = f"{save_path_}_{epoch}.pkl" if add_epoch else f"{save_path_}.pkl"
+                self.save_weights(save_path_)
                 
         if plot_errors:
             plt.figure(figsize=(7, 4))
