@@ -50,6 +50,8 @@ class RBM:
     """
 
     def __init__(self, X, q, use_adam=False):
+        """Initialize a RBM object."""
+
         if len(X.shape) <= 1:
             X = X[np.newaxis, :]
         self.X = X

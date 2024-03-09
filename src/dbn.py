@@ -36,6 +36,8 @@ class DBN:
     """
 
     def __init__(self, X, L, qs, use_adam=False):
+        """Initialize a DBN object."""
+
         self.X = X
         self.L = L
         self.qs = qs
