@@ -10,12 +10,10 @@ from torchvision import models
 import torchvision.transforms as transforms
 
 
-
 def reconstruction_loss(data, reconstructions):
-    #print(data.mean(), reconstructions.mean())
-
     loss = F.binary_cross_entropy(reconstructions, data, reduction='sum')
     return loss
+
 
 def kl_normal_loss(mean, logvar, batch_mean=True, component_sum=True):
     """
@@ -40,6 +38,7 @@ def kl_normal_loss(mean, logvar, batch_mean=True, component_sum=True):
         If false, returns a separate value for each latent dimension, if true
         takes the sum over latent dimensions
     """
+
     latent_kl = 0.5 * torch.sum(mean.pow(2) + logvar.exp() - 1 - logvar)
 
     if batch_mean:
@@ -49,6 +48,7 @@ def kl_normal_loss(mean, logvar, batch_mean=True, component_sum=True):
         latent_kl = latent_kl.sum(dim=-1)
 
     return latent_kl
+
 
 class BetaVAELoss(object):
 
@@ -67,7 +67,6 @@ class BetaVAELoss(object):
 
         # Total loss of beta-VAE
         loss = rec_loss + self.beta * kl_loss
-        #loss = torch.clamp(loss, max=1e5)
         return loss
 
 
@@ -82,7 +81,6 @@ class Encoder(nn.Module):
         self.fc = nn.Linear(256, 2*latent_dim)
 
     def forward(self, x):
-        batch_size = x.size(0)
 
         x = self.lin1(x)
         x = F.leaky_relu(x, self.alpha_lrelu)
@@ -91,6 +89,7 @@ class Encoder(nn.Module):
 
         x = self.fc(x)  # no activation
         return x
+
 
 class Decoder(nn.Module):
 
@@ -103,7 +102,6 @@ class Decoder(nn.Module):
         self.lin3 = nn.Linear(512, 784)
 
     def forward(self, x):
-        batch_size = x.size(0)
 
         x = self.lin1(x)
         x = F.leaky_relu(x, self.alpha_lrelu)
@@ -113,6 +111,7 @@ class Decoder(nn.Module):
         x = F.sigmoid(x)
 
         return x
+
 
 class VAEModel(nn.Module):
     def __init__(self, latent_dim, beta, alpha_lrelu=0.3):
@@ -126,7 +125,7 @@ class VAEModel(nn.Module):
         self.encoder = Encoder(latent_dim=latent_dim, alpha_lrelu=alpha_lrelu).to(self.device)
         self.decoder = Decoder(latent_dim=latent_dim, alpha_lrelu=alpha_lrelu).to(self.device)
         self.loss = BetaVAELoss(beta=self.beta)
-        
+
     def reparameterize(self, mean, logvar, mode='sample'):
         """
         Samples from a normal distribution using the reparameterization trick.
@@ -145,12 +144,12 @@ class VAEModel(nn.Module):
             useful at training time. The latter is useful at inference time as
             the mean is usually used for reconstruction, rather than a sample.
         """
-        if mode=='sample':
+        if mode == 'sample':
             # Implements the reparametrization trick:
             std = torch.exp(0.5 * logvar)
             eps = torch.randn_like(std)
             return mean + eps
-        elif mode=='mean':
+        elif mode == 'mean':
             return mean
         else:
             return ValueError("Unknown mode: {mode}".format(mode))
@@ -185,7 +184,6 @@ class VAEModel(nn.Module):
             'stats_qzx': stats_qzx,
             'samples_qzx': samples_qzx}
 
-
     def sample_pz(self, N):
         samples_pz = torch.randn(N, self.latent_dim, device=self.device)
         return samples_pz
@@ -201,16 +199,14 @@ class VAEModel(nn.Module):
         generations = self.decoder(samples_pz)
         return {'generations': generations}
 
-    def train_vae(self, X_train, epochs, learning_rate=1e-3, batch_size=64, 
-                    optimizer=None, print_error_every=1, plot_errors=True, patience=50):
+    def train_vae(self, X_train, epochs, learning_rate=1e-3, batch_size=64,
+                  optimizer=None, print_error_every=1, plot_errors=True, patience=50):
+
         if optimizer is None:
-            #self.optimizer = torch.optim.AdamW(self.parameters(), 
-            #                        weight_decay=learning_rate/10, 
-            #                        lr=learning_rate)
             self.optimizer = torch.optim.Adam(self.parameters(), lr=learning_rate)
 
-        tensor_X = torch.Tensor(X_train) 
-        dataset = TensorDataset(tensor_X) 
+        tensor_X = torch.Tensor(X_train)
+        dataset = TensorDataset(tensor_X)
         dataloader = DataLoader(dataset, batch_size=batch_size)
 
         train_losses = []
@@ -246,7 +242,7 @@ class VAEModel(nn.Module):
                     break
             if (epoch % print_error_every == 0 or epoch == epochs-1) and print_error_every != -1:
                 print(f'Epoch {epoch}: error = {round(train_loss, 4)}')
-                
+
         if plot_errors:
             plt.figure(figsize=(7, 4))
             plt.plot(train_losses)
@@ -257,8 +253,8 @@ class VAEModel(nn.Module):
 
     def test_vae(self, X_test, plot_=True, nb_to_plot=10, ncols=5):
 
-        tensor_X = torch.Tensor(X_test) 
-        dataset = TensorDataset(tensor_X) 
+        tensor_X = torch.Tensor(X_test)
+        dataset = TensorDataset(tensor_X)
         dataloader = DataLoader(dataset, batch_size=32)
 
         test_reconstructions = np.zeros((len(X_test), 28, 28), dtype=np.uint)
@@ -279,7 +275,7 @@ class VAEModel(nn.Module):
 
                 batch_size = stats_qzx.shape[0]
                 test_reconstructions[n:(n+batch_size), :, :] = np.where(
-                    reconstructions.detach().cpu().numpy().reshape(batch_size, 28, 28) >= 0.5, 
+                    reconstructions.detach().cpu().numpy().reshape(batch_size, 28, 28) >= 0.5,
                     1, 0)
                 n += batch_size
 
@@ -352,6 +348,7 @@ def compute_fid_score(X_test, generated_images, device, batch_size=32):
         transforms.CenterCrop((299, 299)),
         transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
     ])
+
     def preprocess_images(images):
         return torch.stack([transform(image) for image in images])
 
@@ -369,13 +366,13 @@ def compute_fid_score(X_test, generated_images, device, batch_size=32):
     if len(X_test.shape) <= 2:
         X_test = X_test.reshape(-1, 1, 28, 28)
 
-    tensor_X = torch.Tensor(X_test) 
-    dataset = TensorDataset(tensor_X) 
+    tensor_X = torch.Tensor(X_test)
+    dataset = TensorDataset(tensor_X)
     dataloader = DataLoader(dataset, batch_size=batch_size)
 
     # Pass real test images through InceptionV3
     real_embeddings = pass_through_inception(dataloader)
-    
+
     torch.cuda.empty_cache()
 
     gen_dataset = TensorDataset(torch.Tensor(generated_images))
