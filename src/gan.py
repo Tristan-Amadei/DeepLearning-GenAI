@@ -37,6 +37,7 @@ def sample_images(generator, z_dim, device, r=5, c=5, binarize=True):
 
     # Rescale images 0 - 1
     if binarize:
+        gen_imgs = (gen_imgs + 1) / 2
         gen_imgs = np.where(gen_imgs > 0.5, 1, 0)
 
     fig, axs = plt.subplots(r, c, figsize=(2*c, 2*r))
@@ -126,7 +127,7 @@ class GAN(nn.Module):
         self.bce_criterion = nn.BCELoss()
 
     def train(self, X_train, epochs, learning_rate, beta_1=0.5,
-              sample_interval=1, n_iters_inner=1, batch_size=64,
+              sample_interval=1, n_inner_disc=1, n_inner_gen=1, batch_size=64,
               plot_every=1):
 
         X_train = np.array(X_train, dtype=np.float32)
@@ -147,7 +148,10 @@ class GAN(nn.Module):
         for epoch in range(epochs):
             for i, data in enumerate(dataloader, 0):
                 d_loss_total = 0.
-                for iter_inner in range(n_iters_inner):
+                d_output_true_total = 0.
+                d_output_fake_total = 0.
+
+                for iter_inner in range(n_inner_disc):
 
                     ############################
                     # Train discriminator
@@ -162,6 +166,7 @@ class GAN(nn.Module):
                     d_loss_true = self.bce_criterion(d_output_true, true_labels)
                     d_loss_true.backward()
                     disc_true_value = d_output_true.mean().item()
+                    d_output_true_total += disc_true_value
 
                     # Train with fake data batch
                     z_latent_noise = torch.randn(true_imgs.size(0), self.latent_dim,
@@ -172,32 +177,40 @@ class GAN(nn.Module):
                     disc_loss_fake = self.bce_criterion(disc_output_fake, fake_labels)
                     disc_loss_fake.backward()
                     disc_fake_value = disc_output_fake.mean().item()
+                    d_output_fake_total += disc_fake_value
                     optimizer_disc.step()
 
                     d_loss_total += d_loss_true + disc_loss_fake
 
-                ############################
-                # Train generator
-                ############################
-                self.gen_model.zero_grad()
+                g_loss_total = 0.
+                for iter_inner in range(n_inner_gen):
+                    ############################
+                    # Train generator
+                    ############################
+                    self.gen_model.zero_grad()
 
-                z_latent_noise = torch.randn(true_imgs.size(0), self.latent_dim,
-                                             device=self.device)
-                fake_imgs = self.gen_model(z_latent_noise)
-                disc_gen_output_fake = self.disc_model(fake_imgs)
-                wrong_labels_gen = torch.ones_like(disc_gen_output_fake, device=self.device)
-                g_loss = self.bce_criterion(disc_gen_output_fake, wrong_labels_gen)
-                g_loss.backward()
-                optimizer_gen.step()
+                    z_latent_noise = torch.randn(true_imgs.size(0), self.latent_dim,
+                                                 device=self.device)
+                    fake_imgs = self.gen_model(z_latent_noise)
+                    disc_gen_output_fake = self.disc_model(fake_imgs)
+                    wrong_labels_gen = torch.ones_like(disc_gen_output_fake, device=self.device)
+                    g_loss = self.bce_criterion(disc_gen_output_fake, wrong_labels_gen)
+                    g_loss_total += g_loss.item()
+                    g_loss.backward()
+                    optimizer_gen.step()
 
                 # Save Losses for plotting later
-                G_losses.append(g_loss.item())
+                G_losses.append(g_loss_total)
                 D_losses.append(d_loss_total.item())
+
+                # Calculate average discriminator output for true and fake images
+                avg_d_output_true = d_output_true_total / len(dataloader)
+                avg_d_output_fake = d_output_fake_total / len(dataloader)
 
             if (epoch % plot_every == 0 or epoch == epochs - 1) and plot_every != -1:
                 print(f'Epoch {epoch+1}/{epochs}:: loss_disc: {d_loss_total.item():.4f}, '
-                      f'loss_gen: {g_loss.item():.4f}, D(x): {disc_true_value:.4f}, '
-                      f'D(G(z)): {disc_fake_value:.4f}')
+                      f'loss_gen: {g_loss_total:.4f}, D(x): {avg_d_output_true:.4f}, '
+                      f'D(G(z)): {avg_d_output_fake:.4f}')
 
             if epoch % sample_interval == 0:
                 sample_images(self.gen_model, self.latent_dim, self.device,

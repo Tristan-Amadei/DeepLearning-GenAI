@@ -77,7 +77,7 @@ def load_mnist(train_images_filepath=train_images_filepath, train_labels_filepat
 
     if binarize:
         X_train = (X_train > 0.5).astype(int)
-        X_test = (X_train > 0.5).astype(int)
+        X_test = (X_test > 0.5).astype(int)
 
     y_train = one_hot_encode(y_train)
     y_test = one_hot_encode(y_test)
